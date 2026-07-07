@@ -1,0 +1,10 @@
+# SISMID 2026 minimal environment.
+# Kept intentionally small for the initial lightweight Codespace.
+# Versions will be pinned before the course for a fully reproducible build.
+numpy
+pandas
+matplotlib
+scikit-learn
+jupyterlab
+ipykernel
+requests

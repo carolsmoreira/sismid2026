@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Secrets: never commit agent keys or tokens
+.env
+*.key
+*_key
+*.pem
+
+# OS
+.DS_Store
