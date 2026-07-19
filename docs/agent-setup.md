@@ -68,6 +68,19 @@ provided) will use them automatically. Nothing is written to disk in plaintext.
 - If you open a new terminal, run `source scripts/agent-login.sh` again.
 - Wrong passcode just fails cleanly; ask the instructor and retry.
 
+Then start the agent:
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+That flag lets the agent read, edit, and run commands **without stopping to ask each
+time**. We use it on purpose so you see what an autonomous agent actually does, and it
+is safe here because your Codespace is a disposable container, not your own machine.
+`source scripts/agent-login.sh` already completed Claude Code's first-run setup for you,
+so it opens straight to the prompt with no login screen. (Codex: run `codex` the same
+way once its key is provided.)
+
 ### Gemini: bring your own free login
 
 Gemini CLI has a generous free tier. Just run `gemini` and sign in with any Google
