@@ -5,12 +5,12 @@ this yourself afterward, on your own laptop or server, not just in our preconfig
 Codespace. This initial environment ships **no agent**, only Node.js so the install is
 a single command.
 
-We will use **three** command-line agents in class so you can compare them. All three
-are CLIs that install with `npm` and run right in the browser Codespace:
+We will use **three** command-line agents in class so you can compare them. They run
+right in the browser Codespace (two install with `npm`, one with its own installer):
 
 - **OpenAI Codex CLI**
 - **Anthropic Claude Code**
-- **Google Gemini CLI**
+- **Google Antigravity CLI** (`agy`)
 
 ## One-step install
 
@@ -20,9 +20,9 @@ From a terminal in your Codespace:
 bash scripts/setup-agents.sh
 ```
 
-This installs all three CLIs globally via `npm`. It does **not** log you in;
-authentication is a separate step (below), because how we hand out access to the whole
-class is still being finalized.
+This installs all three CLIs. It does **not** log you in; authentication is a separate
+step (below), and it differs per agent: Claude Code uses a shared encrypted token, Codex
+uses a per-student credential broker, and Antigravity uses your own free Google login.
 
 ## Manual install (what the script does)
 
@@ -33,8 +33,8 @@ npm install -g @openai/codex
 # Anthropic Claude Code
 npm install -g @anthropic-ai/claude-code
 
-# Google Gemini CLI
-npm install -g @google/gemini-cli
+# Google Antigravity CLI (not on npm; ships its own installer)
+curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
 
 Verify:
@@ -42,7 +42,7 @@ Verify:
 ```bash
 codex --version
 claude --version
-gemini --version
+agy --version
 ```
 
 ## Authentication
@@ -59,9 +59,9 @@ From a terminal in your Codespace:
 source scripts/agent-login.sh
 ```
 
-Enter the class passcode when prompted. This decrypts the shared credential(s) into
-environment variables in your current shell, and `claude` (and `codex`, if a key is
-provided) will use them automatically. Nothing is written to disk in plaintext.
+Enter the class passcode when prompted. This decrypts the shared **Claude Code** token so
+`claude` picks it up automatically. (Codex has its own step below; Antigravity uses your
+own free Google login.)
 
 - You must use `source` (not `bash scripts/agent-login.sh`), or the variables will not
   stick to your shell.
@@ -84,13 +84,41 @@ That flag lets the agent read, edit, and run commands **without stopping to ask 
 time**. We use it on purpose so you see what an autonomous agent actually does, and it
 is safe here because your Codespace is a disposable container, not your own machine.
 `source scripts/agent-login.sh` already completed Claude Code's first-run setup for you,
-so it opens straight to the prompt with no login screen. (Codex: run `codex` the same
-way once its key is provided.)
+so it opens straight to the prompt with no login screen.
 
-### Gemini: bring your own free login
+### Codex: get your own credential from the class broker
 
-Gemini CLI has a generous free tier. Just run `gemini` and sign in with any Google
-account. This is also the **backup** if the shared credential is unavailable.
+Codex uses a **separate, per-student** credential handed out by a small class server, so
+no two students share one login. Once, in your Codespace:
+
+```bash
+bash scripts/codex-login.sh http://HOST:PORT   # URL announced in class
+```
+
+Enter **your email** and the **class passcode**. It fetches your own credential into
+`~/.codex/auth.json`, then just run:
+
+```bash
+codex
+```
+
+The server assigns you one credential and remembers it **by your email**, so if your
+Codespace restarts (or you make a new one) and you enter the same email, you get the
+**same** credential back, never someone else's. If it says the pool is empty, the passcode
+is wrong, or your email is not on the roster, tell the instructor. The script will not
+overwrite an existing `~/.codex/auth.json`, so run it only once per Codespace.
+
+### Antigravity: bring your own free login
+
+Antigravity CLI has a free tier (the "Starter Quota", running Gemini models). Just run
+`agy` and sign in with any Google account: it opens a browser tab locally, and in a
+remote session (like a Codespace terminal) it prints a URL for you to open. This is also
+the **backup** if the shared credential is unavailable.
+
+> This replaces the old Gemini CLI. Google retired the free "Sign in with Google" tier of
+> Gemini CLI for individual accounts on **2026-06-18**, before this course, and points
+> everyone to Antigravity. `agy` is that successor. (Codex and Claude Code are unaffected;
+> they use the shared instructor credential above.)
 
 ### Instructor: create / rotate the encrypted secret
 
@@ -122,6 +150,41 @@ students kept stop working.
 
 > Golden rule: **credentials never get committed in plaintext and never get pasted into a
 > notebook cell.** Only the encrypted `.enc` blob and the spoken passcode leave your hands.
+
+### Instructor: run the Codex credential broker
+
+Codex has no long-lived shareable token, and one ChatGPT `auth.json` shared across the
+class hard-fails (concurrent clients trip refresh-token reuse). So generate **one
+credential per student** and hand them out with a small server that never gives the same
+one to two students.
+
+```bash
+# 1. Generate N device credentials (each is a separate device authorization):
+mkdir -p ~/sismid-creds
+for i in $(seq -w 1 20); do
+  CODEX_HOME=~/sismid-creds/tmp codex login --device-auth   # approve in browser
+  mv ~/sismid-creds/tmp/auth.json ~/sismid-creds/auth-$i.json
+done
+
+# 2. Deploy the broker + creds to your always-on host and start it:
+scripts/deploy-codex-server.sh always-on ~/sismid-creds sismid-codex 8080
+#    then follow the printed steps: set the passcode file, open the firewall, ./start.sh
+```
+
+The broker (`server/serve.py`) requires each student's **email plus the passcode**,
+assigns distinct credentials keyed by email (so `state.json` is your roster of who has
+which), and exposes `/status` to watch usage. To restrict claims to a known class list,
+put one email per line in a file and start with `SISMID_ALLOW=/path/to/emails.txt`;
+without it, any valid email is accepted. Keep in mind:
+
+- **Capacity:** 20 device codes from one ChatGPT account is still ONE subscription's rate
+  limit shared 20 ways; it does not multiply seats. Fine for bursty use on ChatGPT Pro, it
+  will throttle under fully synchronized load. The account may also cap concurrent sessions.
+- **Transit:** plain HTTP sends the passcode and credential in the clear. Use a strong
+  passcode, take the server down after class (`./stop.sh` + delete the firewall rule), and
+  rotate the ChatGPT logins afterward.
+- **Never commit** `creds/`, `state.json`, or `passcode`; `.gitignore` blocks `auth-*.json`
+  and friends. If you want independent capacity instead, use `OPENAI_API_KEY` (above).
 
 ## If you cannot get an agent working
 
