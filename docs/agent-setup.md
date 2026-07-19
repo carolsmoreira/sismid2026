@@ -65,14 +65,20 @@ provided) will use them automatically. Nothing is written to disk in plaintext.
 
 - You must use `source` (not `bash scripts/agent-login.sh`), or the variables will not
   stick to your shell.
-- If you open a new terminal, run `source scripts/agent-login.sh` again.
+- You only need to do this **once per Codespace**. The unlock also saves the token to
+  your `~/.bashrc`, so new terminals and a Codespace restart stay logged in. (If you
+  ever rebuild the container from scratch, run it again.)
 - Wrong passcode just fails cleanly; ask the instructor and retry.
 
-Then start the agent:
+Then start the agent **in the terminal**:
 
 ```bash
 claude --dangerously-skip-permissions
 ```
+
+Use the terminal, not the VS Code "Claude Code" side panel. In a Codespace the panel
+starts before you unlock and cannot see the shared token, so it will show a login
+screen; the terminal is the supported path for this class.
 
 That flag lets the agent read, edit, and run commands **without stopping to ask each
 time**. We use it on purpose so you see what an autonomous agent actually does, and it
