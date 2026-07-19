@@ -5,10 +5,12 @@ this yourself afterward, on your own laptop or server, not just in our preconfig
 Codespace. This initial environment ships **no agent**, only Node.js so the install is
 a single command.
 
-We will use **two** agents so you can compare them:
+We will use **three** command-line agents in class so you can compare them. All three
+are CLIs that install with `npm` and run right in the browser Codespace:
 
 - **OpenAI Codex CLI**
 - **Anthropic Claude Code**
+- **Google Gemini CLI**
 
 ## One-step install
 
@@ -18,9 +20,9 @@ From a terminal in your Codespace:
 bash scripts/setup-agents.sh
 ```
 
-This installs both CLIs globally via `npm`. It does **not** log you in; authentication
-is a separate step (below), because how we hand out access to the whole class is still
-being finalized.
+This installs all three CLIs globally via `npm`. It does **not** log you in;
+authentication is a separate step (below), because how we hand out access to the whole
+class is still being finalized.
 
 ## Manual install (what the script does)
 
@@ -30,6 +32,9 @@ npm install -g @openai/codex
 
 # Anthropic Claude Code
 npm install -g @anthropic-ai/claude-code
+
+# Google Gemini CLI
+npm install -g @google/gemini-cli
 ```
 
 Verify:
@@ -37,28 +42,67 @@ Verify:
 ```bash
 codex --version
 claude --version
+gemini --version
 ```
 
-## Authentication (to be finalized before the course)
+## Authentication
 
-> The class-wide authentication method is **not decided yet**. Do not hard-code any
-> shared key into a notebook or commit a key to the repo. Instructors will provide the
-> agreed method on the day. The options we are weighing:
+For **Claude Code** (and any other instructor-provided credential), the class uses a
+shared secret that is stored **encrypted** in the repo and unlocked with a **class
+passcode** the instructor gives out on the day.
 
-- **Bring your own login.** Sign in with your own OpenAI / Anthropic account.
-  - Codex: `codex login`
-  - Claude Code: `claude login` (or `claude` and follow the prompt)
-- **Instructor-provided key or token** exported as an environment variable in your
-  Codespace for the session, for example:
-  ```bash
-  export OPENAI_API_KEY=...        # Codex
-  export ANTHROPIC_API_KEY=...     # Claude Code
-  ```
-  If we go this route, the key is provided in class and is short-lived; never commit it.
-- **A shared gateway / proxy** that issues per-student short-lived tokens.
+### Students: unlock in one step
 
-Whichever method we use, the golden rule is the same: **keys never get committed to the
-repository and never get pasted into a notebook cell.**
+From a terminal in your Codespace:
+
+```bash
+source scripts/agent-login.sh
+```
+
+Enter the class passcode when prompted. This decrypts the shared credential(s) into
+environment variables in your current shell, and `claude` (and `codex`, if a key is
+provided) will use them automatically. Nothing is written to disk in plaintext.
+
+- You must use `source` (not `bash scripts/agent-login.sh`), or the variables will not
+  stick to your shell.
+- If you open a new terminal, run `source scripts/agent-login.sh` again.
+- Wrong passcode just fails cleanly; ask the instructor and retry.
+
+### Gemini: bring your own free login
+
+Gemini CLI has a generous free tier. Just run `gemini` and sign in with any Google
+account. This is also the **backup** if the shared credential is unavailable.
+
+### Instructor: create / rotate the encrypted secret
+
+Run this on your own machine (it never prints the secret and never writes plaintext):
+
+```bash
+# 1. Mint a long-lived Claude Code token (valid ~1 year):
+claude setup-token          # copy the CLAUDE_CODE_OAUTH_TOKEN it prints
+
+# 2. Encrypt it under the class passcode:
+scripts/secret-encrypt.sh CLAUDE_CODE_OAUTH_TOKEN
+#    paste the token, then type the class passcode twice
+
+# 3. Commit the encrypted blob (only the .enc file is safe to commit):
+git add secrets/CLAUDE_CODE_OAUTH_TOKEN.enc && git commit -m "Add encrypted agent token"
+```
+
+To also share an OpenAI key for Codex, repeat with `scripts/secret-encrypt.sh
+OPENAI_API_KEY`. (Codex has no long-lived subscription token like Claude's, so use an
+`OPENAI_API_KEY` here.) The env-var **name** you pass is exactly what students receive.
+
+**Encryption details:** AES-256-CBC, PBKDF2-SHA256 at 600k iterations, random salt,
+base64 armored. Only `secrets/*.enc` can be committed; `.gitignore` blocks any plaintext
+that lands in `secrets/`.
+
+**After the course:** revoke access by rotating the credential at its source (re-run
+`claude setup-token` to invalidate the old one, or delete the OpenAI key), so any copies
+students kept stop working.
+
+> Golden rule: **credentials never get committed in plaintext and never get pasted into a
+> notebook cell.** Only the encrypted `.enc` blob and the spoken passcode leave your hands.
 
 ## If you cannot get an agent working
 

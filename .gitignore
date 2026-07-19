@@ -11,5 +11,11 @@ venv/
 *_key
 *.pem
 
+# Agent secrets: ONLY the encrypted .enc blobs may be committed.
+# Any plaintext that lands in secrets/ is ignored by default.
+secrets/*
+!secrets/*.enc
+!secrets/README.md
+
 # OS
 .DS_Store
