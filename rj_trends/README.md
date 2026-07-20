@@ -5,6 +5,8 @@
 - `rio_dengue_trends_2024.png`: individual query terms in 2024.
 - `rio_dengue_trends_5y.png`: individual query terms over the past five years.
 - `rio_dengue_terms_vs_topic_2024.png`: individual terms versus the combined query and Google Trends dengue topic.
+- `rio_dengue_terms_vs_topic_5y.png`: the same term-versus-topic comparison over the past five years.
+- `rio_dengue_terms_vs_topic_5y.csv`: weekly values used for the five-year term-versus-topic plot.
 - `rio_dengue_trends_vs_sinan_2024_weekly.csv`: 2024 weekly Trends and SINAN notification comparison table.
 - `rio_dengue_trends_vs_sinan_2024.png`: 2024 Trends versus SINAN notification comparison plot.
 
