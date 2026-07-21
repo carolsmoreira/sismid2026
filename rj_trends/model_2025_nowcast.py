@@ -1,4 +1,4 @@
-"""Evaluate Rio dengue Google-Trends nowcasts against 2025 SINAN notifications.
+"""Evaluate Rio dengue nowcasts against 2025 SINAN notifications.
 
 Inputs are the archived weekly CSVs in this folder.  The script writes the fixed
 and dynamic multiple-linear-regression predictions, metrics, and comparison plot.
@@ -15,7 +15,8 @@ from sklearn.preprocessing import StandardScaler
 
 
 HERE = Path(__file__).resolve().parent
-FEATURES = ["dengue", "fever", "sintomas_de_dengue"]
+TREND_FEATURES = ["dengue", "fever", "sintomas_de_dengue"]
+FEATURES = [*TREND_FEATURES, "dengue_pt_wikipedia"]
 
 
 def metrics(actual, predicted):
@@ -27,18 +28,37 @@ def metrics(actual, predicted):
     }
 
 
+def add_wikipedia_pageviews(data: pd.DataFrame) -> pd.DataFrame:
+    """Join monthly Portuguese Wikipedia dengue pageviews to weekly data."""
+    wiki = pd.read_csv(
+        HERE.parent / "wikipedia" / "dengue_pageviews_en_es_pt.csv",
+        parse_dates=["date"],
+    )[["date", "dengue_pt"]].rename(columns={"dengue_pt": "dengue_pt_wikipedia"})
+    result = pd.merge_asof(
+        data.sort_values("date"), wiki.sort_values("date"), on="date", direction="backward"
+    )
+    if result[FEATURES].isna().any().any():
+        raise ValueError("Missing Google Trends or Wikipedia predictor values")
+    return result
+
+
 def main():
     trends = pd.read_csv(HERE / "my_topic_search.csv", parse_dates=["date"])
     train = pd.read_csv(
         HERE / "rio_dengue_trends_vs_sinan_2024_weekly.csv", parse_dates=["date"]
-    )[["date", *FEATURES, "sinan_notified_cases"]]
+    )[["date", *TREND_FEATURES, "sinan_notified_cases"]]
     actual_2025 = pd.read_csv(
         HERE / "rio_dengue_sinan_2025_weekly.csv", parse_dates=["date"]
     )
+    # The final 2024 row overlaps the first 2025 outcome week, where its archived
+    # 2024 extract recorded zero notifications. Retain the 2025 value only.
+    train = train.query("date <= '2024-12-22'")
     test = trends[
-        (trends["date"] >= "2024-12-29") & (trends["date"] <= "2025-12-28")
-    ][["date", *FEATURES]].merge(actual_2025, on="date", how="left")
+        (trends["date"] >= "2024-12-29") & (trends["date"] <= "2025-12-21")
+    ][["date", *TREND_FEATURES]].merge(actual_2025, on="date", how="left")
     test["sinan_notified_cases"] = test["sinan_notified_cases"].fillna(0).astype(int)
+    train = add_wikipedia_pageviews(train)
+    test = add_wikipedia_pageviews(test)
 
     # Fixed model: all coefficients are estimated from 2024 only.
     fixed = make_pipeline(StandardScaler(), LinearRegression())
@@ -77,11 +97,17 @@ def main():
             label="Fixed 2024 multiple linear regression")
     ax.plot(test["date"], test["dynamic_52_week_prediction"], color="#2ca02c", lw=2.2,
             label="Dynamic 52-week multiple linear regression")
-    ax.set(title="Rio dengue nowcast: fixed vs dynamic multiple linear regression",
+    ax.set(title="Rio dengue nowcast, 2025: Google Trends + Wikipedia",
            xlabel="Week beginning", ylabel="Notified dengue cases")
     ax.grid(alpha=0.25)
     ax.legend(frameon=False)
-    fig.tight_layout()
+    fig.text(
+        0.5, 0.01,
+        "Predictors: same-week Google Trends for dengue, fever, and sintomas de dengue; "
+        "monthly Portuguese Wikipedia dengue pageviews.",
+        ha="center", fontsize=9,
+    )
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(HERE / "rio_dengue_2025_mlr_dynamic.png", dpi=180)
 
     print(results.round(2).to_string(index=False))

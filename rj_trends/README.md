@@ -19,21 +19,46 @@
 
 The SINAN series represents notified dengue cases among Rio de Janeiro residents, grouped by symptom-onset week.
 
-The 2025 model is a ridge regression fit on log weekly notifications from 2024 using the same-week Google Trends values for `dengue`, `fever`, and `sintomas de dengue`. It is a nowcast, not an advance forecast, because 2025 searches are inputs to its 2025 estimates.
+The 2025 models are multiple linear regressions fit on log weekly notifications.
+They use same-week Google Trends values for `dengue`, `fever`, and `sintomas de dengue`,
+plus Portuguese Wikipedia `Dengue` monthly pageviews carried across the weeks in
+each month. The Wikipedia series is Brazil-oriented rather than Rio-specific. These
+are nowcasts, not advance forecasts, because the search and pageview signals are
+contemporaneous.
 
-The dynamic multiple-linear-regression model refits each week on the most recent 52 observed weeks, using only observations available before that prediction week.
+The dynamic multiple-linear-regression model refits each week on the most recent
+52 observed weeks, using only observations available before that prediction week.
+The final, partial week beginning 2025-12-28 is excluded from scoring.
 
 ## 2025 model check
 
 | Model | Training scheme | MAE | RMSE | Pearson correlation |
 |---|---|---:|---:|---:|
-| Fixed multiple linear regression | 2024 only | 396 | 441 | 0.68 |
-| Dynamic multiple linear regression | preceding 52 observed weeks | 223 | 357 | 0.76 |
+| Fixed multiple linear regression | 2024 only | 404 | 454 | 0.78 |
+| Dynamic multiple linear regression | preceding 52 observed weeks | 186 | 285 | 0.86 |
 
-Both models use same-week Google Trends values for `dengue`, `fever`, and
-`sintomas de dengue`; they are nowcasts rather than advance forecasts. The dynamic
-model may use prior 2025 notifications as they become available, whereas the fixed
-model does not.
+Both models use same-week Google Trends values and monthly Portuguese Wikipedia
+pageviews; they are nowcasts rather than advance forecasts. The dynamic model may
+use prior 2025 notifications as they become available, whereas the fixed model does
+not.
+
+## Comparison with the previous Google-Trends-only models
+
+The comparison below evaluates both versions on the same 52 complete weeks of
+2025. Adding Portuguese Wikipedia `Dengue` pageviews substantially improved the
+dynamic model: MAE fell from 226 to 186 (18%), RMSE fell from 360 to 285 (21%),
+and correlation rose from 0.75 to 0.86. The fixed 2024-only model followed the
+weekly pattern more closely (correlation 0.68 to 0.78), but its MAE increased
+slightly (392 to 404). This suggests the Wikipedia signal is most useful in the
+rolling nowcast, which can adapt as the attention--case relationship changes.
+
+See `rio_dengue_2025_nowcast_version_comparison.png` for the weekly trajectories
+and `rio_dengue_2025_nowcast_version_comparison_metrics.csv` for the matched-week
+metrics. Recreate them with:
+
+```bash
+python rj_trends/compare_nowcast_versions.py
+```
 
 Recreate the dynamic-model outputs with:
 
