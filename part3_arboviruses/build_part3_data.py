@@ -128,6 +128,14 @@ def main() -> None:
         [aggregate_notifications(disease, year) for disease in DISEASES for year in (2024, 2025)],
         ignore_index=True,
     )
+    # The Sunday-starting week at the annual boundary is represented by days in
+    # both extracts (for example, 2024-12-29). Sum those complementary partial
+    # weeks into one disease-week before modeling.
+    notifications = (
+        notifications.groupby(["date", "disease"], as_index=False)["sinan_notifications"]
+        .sum()
+        .sort_values(["disease", "date"])
+    )
     notifications.to_csv(HERE / "brazil_arbovirus_sinan_notifications_2024_2025_weekly.csv", index=False)
 
     trends = fetch_google_trends()
